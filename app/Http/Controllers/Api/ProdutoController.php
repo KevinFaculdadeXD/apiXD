@@ -5,30 +5,41 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ProdutoRequest;
 use App\Http\Resources\ProdutoResource;
-use App\Models\Produtos;
+use App\Models\Produto;
 use App\Services\ProdutoService;
 use Illuminate\Http\Request;
 
 class ProdutoController extends Controller
 {
-
     public function __construct(private ProdutoService $service)
     {
-
     }
 
-
-    public function index()
+    public function index(Request $request)
     {
-        return ProdutoResource::collection(Produtos::latest()->paginate(10));
+        $validados = $request->validate([
+            'search'     => 'sometimes|nullable|string|max:255',
+            'preco_min'  => 'sometimes|nullable|numeric|min:0',
+            'preco_max'  => 'sometimes|nullable|numeric|min:0|gte:preco_min',
+            'em_estoque' => 'sometimes|nullable|boolean',
+        ]);
+
+        $filtros = [
+            'search'     => $validados['search'] ?? null,
+            'preco_min'  => $validados['preco_min'] ?? null,
+            'preco_max'  => $validados['preco_max'] ?? null,
+            'em_estoque' => isset($validados['em_estoque'])
+                ? $request->boolean('em_estoque')
+                : null,
+        ];
+
+        return ProdutoResource::collection(
+            $this->service->listar($filtros)
+        );
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(ProdutoRequest $request)
     {
-
         $produto = $this->service->create($request->validated());
 
         return (new ProdutoResource($produto))
@@ -36,36 +47,22 @@ class ProdutoController extends Controller
             ->setStatusCode(201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Produtos $produto)
+    public function show(Produto $produto)
     {
         return new ProdutoResource($produto);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(ProdutoRequest $request, Produtos $produto)
-{
-    $dados = $request->validated();
-
-    $produto->update($dados);
-
-    return new ProdutoResource($produto);
-}
-
-
-    public function destroy(Produtos $produto)
+    public function update(ProdutoRequest $request, Produto $produto)
     {
-        $produto->delete();
-        return response()->noContent(); // 204
+        $produto = $this->service->update($produto, $request->validated());
 
+        return new ProdutoResource($produto);
     }
 
-public function validarCusto(
-){
+    public function destroy(Produto $produto)
+    {
+        $this->service->delete($produto);
 
-}
+        return response()->noContent(); // 204
+    }
 }
